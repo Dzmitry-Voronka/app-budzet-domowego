@@ -20,13 +20,19 @@ export default function LoginPage() {
       setError("Proszę wypełnić wszystkie pola");
       return;
     }
-
-    // Mock login - in real app, this would call an API
-    if (email === "jan@example.com" && password === "password") {
-      router.push("/dashboard");
-    } else {
-      setError("Nieprawidłowy email lub hasło");
-    }
+    fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw json;
+        router.push("/");
+      })
+      .catch((err) => {
+        setError(err?.error?.code === "INVALID_CREDENTIALS" ? "Nieprawidłowy email lub hasło" : "Wystąpił błąd podczas logowania");
+      });
   };
 
   return (
