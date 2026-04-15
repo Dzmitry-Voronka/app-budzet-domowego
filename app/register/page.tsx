@@ -43,8 +43,21 @@ export default function RegisterPage() {
       return;
     }
 
-    // Mock registration - in real app, this would call an API
-    router.push("/login");
+    // Call registration API
+    fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: formData.name, email: formData.email, password: formData.password }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw json;
+        // registration successful — token cookie set, redirect to dashboard
+        router.push("/");
+      })
+      .catch((err) => {
+        setError(err?.error?.code === "USER_EXISTS" ? "Użytkownik o tym adresie email już istnieje" : "Wystąpił błąd podczas rejestracji");
+      });
   };
 
   return (
