@@ -1,29 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { z } from "zod";
-
-// ── Schemat walidacji ──
-const createTransactionSchema = z.object({
-  categoryId: z.string().uuid(),
-  amount: z.number().positive(),
-  type: z.enum(["INCOME", "EXPENSE"]),
-  description: z.string().max(500).optional(),
-  date: z.string().date(),
-  isRecurring: z.boolean().optional().default(false),
-});
+import { prisma } from "@/src/lib/prisma";
 
 // ── GET /api/transactions ──
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "Zaloguj się" } },
-      { status: 401 }
-    );
-  }
-
   const { searchParams } = new URL(request.url);
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "20");
@@ -34,14 +13,13 @@ export async function GET(request: NextRequest) {
   const sortBy = searchParams.get("sortBy") || "date";
   const order = (searchParams.get("order") || "desc") as "asc" | "desc";
 
-  // Budowanie filtrów
-  const where: any = { userId: session.user.id };
+  const where: Record<string, unknown> = {};
   if (type) where.type = type;
   if (categoryId) where.categoryId = categoryId;
   if (dateFrom || dateTo) {
     where.date = {};
-    if (dateFrom) where.date.gte = new Date(dateFrom);
-    if (dateTo) where.date.lte = new Date(dateTo);
+    if (dateFrom) (where.date as Record<string, unknown>).gte = new Date(dateFrom);
+    if (dateTo) (where.date as Record<string, unknown>).lte = new Date(dateTo);
   }
 
   const [transactions, total] = await Promise.all([
@@ -64,36 +42,21 @@ export async function GET(request: NextRequest) {
 
 // ── POST /api/transactions ──
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { success: false, error: { code: "UNAUTHORIZED", message: "Zaloguj się" } },
-      { status: 401 }
-    );
-  }
-
   const body = await request.json();
-  const result = createTransactionSchema.safeParse(body);
+  const { categoryId, amount, type, description, date, isRecurring } = body;
 
-  if (!result.success) {
+  if (!categoryId || !amount || !type || !date) {
     return NextResponse.json(
       {
         success: false,
-        error: {
-          code: "VALIDATION_ERROR",
-          message: "Nieprawidłowe dane",
-          details: result.error.flatten().fieldErrors,
-        },
+        error: { code: "VALIDATION_ERROR", message: "Brakuje wymaganych pól" },
       },
       { status: 400 }
     );
   }
 
   const transaction = await prisma.transaction.create({
-    data: {
-      ...result.data,
-      userId: session.user.id,
-    },
+    data: { categoryId, amount, type, description, date: new Date(date), isRecurring: isRecurring ?? false },
     include: { category: { select: { id: true, name: true, icon: true, color: true } } },
   });
 
