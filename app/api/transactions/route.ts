@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 // ── POST /api/transactions ──
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { userId, categoryId, amount, type, description, date, isRecurring } = body;
+  const { userId, categoryId, amount, type, description, date } = body;
 
   if (!userId || !categoryId || !amount || !type || !date) {
     return NextResponse.json(
@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
       type,
       description,
       date: new Date(date),
-      isRecurring: isRecurring ?? false,
     },
     include: { category: { select: { id: true, name: true, icon: true, color: true } } },
   });
