@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import IncomeExpensesChart from "./IncomeExpensesChart";
 
 export default async function DashboardPage() {
   // Fetch data from Prisma
@@ -100,16 +100,8 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow-sm p-6 border border-border">
           <h3 className="mb-6">Przychody vs Wydatki</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="income" fill="#10b981" isAnimationActive={false} />
-              <Bar dataKey="expenses" fill="#d4183d" isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
+            {/** Income/Expenses chart (client-only) */}
+            <IncomeExpensesChart data={monthlyData} />
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6 border border-border">
