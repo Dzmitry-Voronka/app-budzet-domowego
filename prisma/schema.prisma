@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -38,6 +37,36 @@ enum NotificationType {
   BUDGET_ALERT
   GOAL_REACHED
   SYSTEM
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum AccountType {
+  CASH
+  BANK
+  CREDIT_CARD
+  SAVINGS
+  INVESTMENT
+  OTHER
+}
+
+enum HouseholdRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -108,11 +137,16 @@ model User {
   sessions Session[]
 
   // Relacje — aplikacja
-  transactions  Transaction[]
-  categories    Category[]
-  budgets       Budget[]
-  savingsGoals  SavingsGoal[]
-  notifications Notification[]
+  transactions       Transaction[]
+  categories         Category[]
+  budgets            Budget[]
+  savingsGoals       SavingsGoal[]
+  notifications      Notification[]
+  financialAccounts  FinancialAccount[]
+  recurringRules     RecurringRule[]
+  tags               Tag[]
+  ownedHousehold     Household?          @relation("HouseholdOwner")
+  householdMemberships HouseholdMember[] @relation("HouseholdMemberUser")
 
   @@map("users")
 }
@@ -149,24 +183,29 @@ model Category {
 // ══════════════════════════════════════════════════════════════
 
 model Transaction {
-  id          String          @id @default(uuid()) @db.Uuid
-  userId      String          @map("user_id") @db.Uuid
-  categoryId  String          @map("category_id") @db.Uuid
-  amount      Decimal         @db.Decimal(12, 2)
-  type        TransactionType
-  description String?         @db.VarChar(500)
-  date        DateTime        @db.Date
-  isRecurring Boolean         @default(false) @map("is_recurring")
-  receiptUrl  String?         @map("receipt_url") @db.VarChar(500)
-  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  categoryId      String          @map("category_id") @db.Uuid
+  accountId       String?         @map("account_id") @db.Uuid
+  recurringRuleId String?         @map("recurring_rule_id") @db.Uuid
+  amount          Decimal         @db.Decimal(12, 2)
+  type            TransactionType
+  description     String?         @db.VarChar(500)
+  date            DateTime        @db.Date
+  receiptUrl      String?         @map("receipt_url") @db.VarChar(500)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relacje
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [categoryId], references: [id])
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category          @relation(fields: [categoryId], references: [id])
+  account       FinancialAccount? @relation(fields: [accountId], references: [id])
+  recurringRule RecurringRule?    @relation(fields: [recurringRuleId], references: [id])
+  tags          TransactionTag[]
 
   @@index([userId, date])
   @@index([categoryId])
+  @@index([accountId])
   @@index([type])
   @@map("transactions")
 }
@@ -234,4 +273,144 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+// ══════════════════════════════════════════════════════════════
+// FINANCIAL_ACCOUNT — konta bankowe, portfele, karty kredytowe
+// ══════════════════════════════════════════════════════════════
+
+model FinancialAccount {
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  name        String      @db.VarChar(100)
+  type        AccountType
+  balance     Decimal     @default(0) @db.Decimal(12, 2)
+  currency    String      @default("PLN") @db.VarChar(3)
+  icon        String?     @db.VarChar(50)
+  color       String?     @db.VarChar(7)
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relacje
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@map("financial_accounts")
+}
+
+// ══════════════════════════════════════════════════════════════
+// RECURRING_RULE — reguły transakcji cyklicznych
+// ══════════════════════════════════════════════════════════════
+
+model RecurringRule {
+  id             String             @id @default(uuid()) @db.Uuid
+  userId         String             @map("user_id") @db.Uuid
+  name           String             @db.VarChar(200)
+  frequency      RecurringFrequency
+  interval       Int                @default(1) // co ile jednostek częstotliwości
+  startDate      DateTime           @map("start_date") @db.Date
+  endDate        DateTime?          @map("end_date") @db.Date
+  nextOccurrence DateTime           @map("next_occurrence") @db.Date
+  lastOccurrence DateTime?          @map("last_occurrence") @db.Date
+  isActive       Boolean            @default(true) @map("is_active")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  // Dane szablonowe (kopiowane do każdej wygenerowanej transakcji)
+  amount      Decimal  @db.Decimal(12, 2)
+  categoryId  String   @map("category_id") @db.Uuid
+  accountId   String?  @map("account_id") @db.Uuid
+  description String?  @db.VarChar(500)
+
+  // Relacje
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([nextOccurrence])
+  @@map("recurring_rules")
+}
+
+// ══════════════════════════════════════════════════════════════
+// TAG — etykiety do dowolnego grupowania transakcji
+// ══════════════════════════════════════════════════════════════
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(50)
+  color     String?  @db.VarChar(7)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relacje
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions TransactionTag[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@map("tags")
+}
+
+model TransactionTag {
+  transactionId String @map("transaction_id") @db.Uuid
+  tagId         String @map("tag_id") @db.Uuid
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  tag         Tag         @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([transactionId, tagId])
+  @@map("transaction_tags")
+}
+
+// ══════════════════════════════════════════════════════════════
+// HOUSEHOLD — wspólne gospodarstwo domowe (plan FAMILY)
+// ══════════════════════════════════════════════════════════════
+
+model Household {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @unique @map("owner_id") @db.Uuid
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relacje
+  owner   User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members HouseholdMember[]
+  invites HouseholdInvite[]
+
+  @@map("households")
+}
+
+model HouseholdMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  householdId String        @map("household_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  role        HouseholdRole @default(MEMBER)
+  joinedAt    DateTime      @default(now()) @map("joined_at") @db.Timestamptz
+
+  // Relacje
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation("HouseholdMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId])
+  @@index([userId])
+  @@map("household_members")
+}
+
+model HouseholdInvite {
+  id          String       @id @default(uuid()) @db.Uuid
+  householdId String       @map("household_id") @db.Uuid
+  email       String       @db.VarChar(255)
+  role        HouseholdRole @default(MEMBER)
+  token       String       @unique @db.VarChar(64)
+  status      InviteStatus @default(PENDING)
+  expiresAt   DateTime     @map("expires_at") @db.Timestamptz
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relacje
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([email])
+  @@map("household_invites")
 }
