@@ -13,16 +13,6 @@ import {
   X,
 } from "lucide-react";
 
-const mockTransactions = [
-  { id: 1, date: "2026-04-14", name: "Zakupy spożywcze", category: "Jedzenie", amount: -245.50, type: "expense" },
-  { id: 2, date: "2026-04-14", name: "Kawiarnia", category: "Rozrywka", amount: -28.50, type: "expense" },
-  { id: 3, date: "2026-04-13", name: "Restauracja", category: "Rozrywka", amount: -120, type: "expense" },
-  { id: 4, date: "2026-04-12", name: "Rachunek za prąd", category: "Rachunki", amount: -180, type: "expense" },
-  { id: 5, date: "2026-04-10", name: "Pensja", category: "Przychód", amount: 5500, type: "income" },
-  { id: 6, date: "2026-04-08", name: "Zakupy spożywcze", category: "Jedzenie", amount: -315.20, type: "expense" },
-  { id: 7, date: "2026-04-05", name: "Paliwo", category: "Transport", amount: -220, type: "expense" },
-];
-
 type TransactionType = "income" | "expense";
 
 interface Transaction {
@@ -33,6 +23,16 @@ interface Transaction {
   amount: number;
   type: TransactionType;
 }
+
+const mockTransactions: Transaction[] = [
+  { id: 1, date: "2026-04-14", name: "Zakupy spożywcze", category: "Jedzenie", amount: -245.50, type: "expense" },
+  { id: 2, date: "2026-04-14", name: "Kawiarnia", category: "Rozrywka", amount: -28.50, type: "expense" },
+  { id: 3, date: "2026-04-13", name: "Restauracja", category: "Rozrywka", amount: -120, type: "expense" },
+  { id: 4, date: "2026-04-12", name: "Rachunek za prąd", category: "Rachunki", amount: -180, type: "expense" },
+  { id: 5, date: "2026-04-10", name: "Pensja", category: "Przychód", amount: 5500, type: "income" },
+  { id: 6, date: "2026-04-08", name: "Zakupy spożywcze", category: "Jedzenie", amount: -315.20, type: "expense" },
+  { id: 7, date: "2026-04-05", name: "Paliwo", category: "Transport", amount: -220, type: "expense" },
+];
 
 export default function TransactionsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
