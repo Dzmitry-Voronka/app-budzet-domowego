@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!token) return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
   let userId: string | null = null;
   try {
-    const payload: any = verifyToken(token);
+    const payload = verifyToken(token);
     userId = payload.userId as string;
   } catch {
     return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   if (!token) return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
   let userId: string | null = null;
   try {
-    const payload: any = verifyToken(token);
+    const payload = verifyToken(token);
     userId = payload.userId as string;
   } catch {
     return NextResponse.json({ success: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       data: {
         user: { connect: { id: userId } },
         category: { connect: { id: parsed.categoryId } },
-        amount: parsed.amount as any,
+        amount: parsed.amount,
         type: parsed.type,
         description: parsed.description,
         date: new Date(parsed.date),
@@ -81,8 +81,8 @@ export async function POST(request: NextRequest) {
       include: { category: { select: { id: true, name: true, icon: true, color: true } } },
     });
     return NextResponse.json({ success: true, data: transaction }, { status: 201 });
-  } catch (err: any) {
-    if (err?.name === "ZodError") {
+  } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
       return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR", issues: err.issues } }, { status: 400 });
     }
     return NextResponse.json({ success: false, error: { code: "SERVER_ERROR", message: String(err) } }, { status: 500 });
