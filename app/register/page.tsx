@@ -56,7 +56,13 @@ export default function RegisterPage() {
         router.push("/");
       })
       .catch((err) => {
-        setError(err?.error?.code === "USER_EXISTS" ? "Użytkownik o tym adresie email już istnieje" : "Wystąpił błąd podczas rejestracji");
+        if (err?.error?.code === "USER_EXISTS") {
+          setError("Użytkownik o tym adresie email już istnieje");
+        } else if (err?.error?.code === "VALIDATION_ERROR") {
+          setError("Dane są niepoprawne. Hasło musi mieć co najmniej 8 znaków.");
+        } else {
+          setError("Wystąpił błąd podczas rejestracji. Spróbuj ponownie.");
+        }
       });
   };
 
