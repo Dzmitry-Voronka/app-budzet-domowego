@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   Receipt,
@@ -13,6 +13,7 @@ import {
   Settings,
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
 
 const navItems = [
@@ -25,13 +26,23 @@ const navItems = [
   { href: "/settings", icon: Settings, label: "Ustawienia" },
 ];
 
-export default function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<{ email: string } | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setUser({ email: json.data.email }); })
+      .catch(() => {});
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8f9fa]">
@@ -84,18 +95,22 @@ export default function AppLayout({
             </ul>
           </nav>
 
-          {/* User info */}
+          {/* User info + logout */}
           <div className="p-4 border-t border-border">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
-                JK
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm select-none">
+                {user?.email?.[0]?.toUpperCase() ?? "?"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm truncate">Jan Kowalski</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  jan@example.com
-                </p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email ?? "..."}</p>
               </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+                aria-label="Wyloguj się"
+              >
+                <LogOut size={18} />
+              </button>
             </div>
           </div>
         </div>

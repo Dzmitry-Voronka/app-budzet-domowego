@@ -24,7 +24,7 @@ export default function RegisterPage() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
     setError("");
 
@@ -38,13 +38,26 @@ export default function RegisterPage() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError("Hasło musi mieć co najmniej 6 znaków");
+    if (formData.password.length < 8) {
+      setError("Hasło musi mieć co najmniej 8 znaków");
       return;
     }
 
-    // Mock registration - in real app, this would call an API
-    router.push("/login");
+    // Call registration API
+    fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: formData.name, email: formData.email, password: formData.password }),
+    })
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw json;
+        // registration successful — token cookie set, redirect to dashboard
+        router.push("/");
+      })
+      .catch((err) => {
+        setError(err?.error?.code === "USER_EXISTS" ? "Użytkownik o tym adresie email już istnieje" : "Wystąpił błąd podczas rejestracji");
+      });
   };
 
   return (
