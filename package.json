@@ -10,7 +10,7 @@
     "postinstall": "prisma generate"
   },
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",
