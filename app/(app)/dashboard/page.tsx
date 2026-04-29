@@ -44,7 +44,7 @@ export default async function DashboardPage() {
       {budgetAlerts.some((a) => a.type === "exceeded") && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="text-destructive flex-shrink-0 mt-0.5" size={20} />
+            <AlertTriangle className="text-destructive shrink-0 mt-0.5" size={20} />
             <div>
               <h4 className="text-destructive mb-1">Przekroczono budżet!</h4>
               <p className="text-sm text-destructive/80">Sprawdź szczegóły budżetów.</p>
