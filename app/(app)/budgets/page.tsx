@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
+import { getServerUserId } from "@/lib/server-auth";
 import BudgetsClient from "./BudgetsClient";
 
 export default async function BudgetsPage() {
@@ -7,18 +8,21 @@ export default async function BudgetsPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
+  const userId = await getServerUserId();
+
   const [budgets, categories, transactions] = await Promise.all([
     prisma.budget.findMany({
+      where: { userId },
       include: { category: { select: { id: true, name: true, icon: true, color: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.category.findMany({
-      where: { type: "EXPENSE", isActive: true },
+      where: { OR: [{ userId }, { userId: null }], type: "EXPENSE", isActive: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
     prisma.transaction.findMany({
-      where: { type: "EXPENSE", date: { gte: monthStart, lte: monthEnd } },
+      where: { userId, type: "EXPENSE", date: { gte: monthStart, lte: monthEnd } },
       select: { categoryId: true, amount: true },
     }),
   ]);

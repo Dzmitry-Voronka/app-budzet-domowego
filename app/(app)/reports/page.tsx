@@ -1,11 +1,13 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
+import { getServerUserId } from "@/lib/server-auth";
 import RevenueChart from "./RevenueChart";
 
 export default async function ReportsPage() {
+  const userId = await getServerUserId();
   const now = new Date();
   const yearStart = new Date(now.getFullYear(), 0, 1);
-  const transactions = await prisma.transaction.findMany({ where: { date: { gte: yearStart } } });
+  const transactions = await prisma.transaction.findMany({ where: { userId, date: { gte: yearStart } } });
 
   const monthly = new Map<number, number>();
   for (let i = 0; i < 12; i++) monthly.set(i, 0);

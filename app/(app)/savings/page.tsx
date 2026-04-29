@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
+import { getServerUserId } from "@/lib/server-auth";
 import SavingsClient from "./SavingsClient";
 
 export default async function SavingsPage() {
+  const userId = await getServerUserId();
   const goals = await prisma.savingsGoal.findMany({
-    where: { status: "ACTIVE" },
+    where: { userId, status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
   });
 

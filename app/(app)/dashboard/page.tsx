@@ -1,24 +1,25 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
+import { getServerUserId } from "@/lib/server-auth";
 import Link from "next/link";
 import { TrendingUp, TrendingDown, Wallet, PiggyBank, ArrowUpRight, ArrowDownRight, AlertTriangle } from "lucide-react";
 import IncomeExpensesChart from "./IncomeExpensesChart";
 
 export default async function DashboardPage() {
-  // Fetch data from Prisma
+  const userId = await getServerUserId();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
   const [transactions, budgets, savingsGoals] = await Promise.all([
     prisma.transaction.findMany({
-      where: { date: { gte: monthStart, lte: monthEnd } },
+      where: { userId, date: { gte: monthStart, lte: monthEnd } },
       include: { category: { select: { id: true, name: true } } },
       orderBy: { date: "desc" },
       take: 10,
     }),
-    prisma.budget.findMany({ include: { category: { select: { id: true, name: true } } } }),
-    prisma.savingsGoal.findMany({}),
+    prisma.budget.findMany({ where: { userId }, include: { category: { select: { id: true, name: true } } } }),
+    prisma.savingsGoal.findMany({ where: { userId } }),
   ]);
 
   const totalIncome = transactions.filter((t) => t.type === "INCOME").reduce((s, t) => s + Number(t.amount), 0);

@@ -1,16 +1,20 @@
 export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
+import { getServerUserId } from "@/lib/server-auth";
 import TransactionsClient from "./TransactionsClient";
 
 export default async function TransactionsPage() {
+  const userId = await getServerUserId();
+
   const [transactions, categories] = await Promise.all([
     prisma.transaction.findMany({
+      where: { userId },
       include: { category: { select: { id: true, name: true, icon: true, color: true } } },
       orderBy: { date: "desc" },
       take: 100,
     }),
     prisma.category.findMany({
-      where: { isActive: true },
+      where: { OR: [{ userId }, { userId: null }], isActive: true },
       orderBy: { name: "asc" },
       select: { id: true, name: true, type: true },
     }),
