@@ -190,8 +190,8 @@ export default function SavingsClient({ initialGoals }: { initialGoals: Goal[] }
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setDepositModal(null)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent">Anuluj</button>
-              <button onClick={handleDeposit} disabled={loading || !depositAmount} className={`flex-1 px-4 py-2 rounded-lg text-white disabled:opacity-50 ${depositModal.type === "deposit" ? "bg-success hover:opacity-90" : "bg-primary hover:opacity-90"}`}>
-                {loading ? "..." : depositModal.type === "deposit" ? "Wpłać" : "Wypłać"}
+              <button onClick={handleDeposit} disabled={depositLoading || !depositAmount} className={`flex-1 px-4 py-2 rounded-lg text-white disabled:opacity-50 ${depositModal.type === "deposit" ? "bg-success hover:opacity-90" : "bg-primary hover:opacity-90"}`}>
+                {depositLoading ? "..." : depositModal.type === "deposit" ? "Wpłać" : "Wypłać"}
               </button>
             </div>
           </div>
