@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { ProfileSchema as Schema } from "@/lib/validations";
@@ -13,8 +14,8 @@ export async function PUT(request: NextRequest) {
 
     const user = await prisma.user.update({ where: { id: auth.userId }, data: parsed });
     return NextResponse.json({ success: true, data: { id: user.id, name: user.name, email: user.email, currency: user.currency, language: user.language } });
-  } catch (err: any) {
-    if (err?.name === "ZodError") return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR" } }, { status: 400 });
+  } catch (err: unknown) {
+    if (err instanceof ZodError) return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR" } }, { status: 400 });
     return NextResponse.json({ success: false, error: { code: "SERVER_ERROR", message: String(err) } }, { status: 500 });
   }
 }

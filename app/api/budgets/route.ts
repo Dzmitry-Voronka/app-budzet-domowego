@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { BudgetSchema as Schema } from "@/lib/validations";
@@ -37,8 +38,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: budget }, { status: 201 });
-  } catch (err: any) {
-    if (err?.name === "ZodError") return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR", issues: err.issues } }, { status: 400 });
+  } catch (err: unknown) {
+    if (err instanceof ZodError) return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR", issues: err.issues } }, { status: 400 });
     return NextResponse.json({ success: false, error: { code: "SERVER_ERROR", message: String(err) } }, { status: 500 });
   }
 }

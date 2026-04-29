@@ -36,8 +36,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     return NextResponse.json({ success: true, data: updated });
-  } catch (err: any) {
-    if (err?.name === "ZodError") return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR" } }, { status: 400 });
+  } catch (err: unknown) {
+    if (err instanceof z.ZodError) return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR" } }, { status: 400 });
     return NextResponse.json({ success: false, error: { code: "SERVER_ERROR", message: String(err) } }, { status: 500 });
   }
 }

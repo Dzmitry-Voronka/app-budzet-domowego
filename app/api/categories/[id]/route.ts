@@ -21,8 +21,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const result = await prisma.category.updateMany({ where: { id, userId: auth.userId }, data: parsed });
     if (result.count === 0) return NextResponse.json({ success: false, error: { code: "NOT_FOUND" } }, { status: 404 });
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    if (err?.name === "ZodError") return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR" } }, { status: 400 });
+  } catch (err: unknown) {
+    if (err instanceof z.ZodError) return NextResponse.json({ success: false, error: { code: "VALIDATION_ERROR" } }, { status: 400 });
     return NextResponse.json({ success: false, error: { code: "SERVER_ERROR", message: String(err) } }, { status: 500 });
   }
 }
