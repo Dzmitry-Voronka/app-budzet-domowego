@@ -4,66 +4,45 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, UserPlus } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { RegisterSchema, type RegisterFormData } from "@/lib/validations";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-  });
-  const [error, setError] = useState("");
+  const [serverError, setServerError] = useState("");
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(RegisterSchema),
+  });
 
-  const handleSubmit = (e: { preventDefault(): void }) => {
-    e.preventDefault();
-    setError("");
-
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError("Proszę wypełnić wszystkie pola");
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError("Hasła nie są identyczne");
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError("Hasło musi mieć co najmniej 8 znaków");
-      return;
-    }
-
-    // Call registration API
-    fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: formData.name, email: formData.email, password: formData.password }),
-    })
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw json;
-        // registration successful — token cookie set, redirect to dashboard
-        router.push("/");
-      })
-      .catch((err) => {
-        if (err?.error?.code === "USER_EXISTS") {
-          setError("Użytkownik o tym adresie email już istnieje");
-        } else if (err?.error?.code === "VALIDATION_ERROR") {
-          setError("Dane są niepoprawne. Hasło musi mieć co najmniej 8 znaków.");
-        } else {
-          setError("Wystąpił błąd podczas rejestracji. Spróbuj ponownie.");
-        }
+  const onSubmit = async (data: RegisterFormData) => {
+    setServerError("");
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
       });
+      const json = await res.json();
+      if (!res.ok) throw json;
+      router.push("/");
+    } catch (err: unknown) {
+      const e = err as { error?: { code?: string } };
+      if (e?.error?.code === "USER_EXISTS") {
+        setServerError("Użytkownik o tym adresie email już istnieje");
+      } else if (e?.error?.code === "VALIDATION_ERROR") {
+        setServerError("Dane są niepoprawne. Hasło musi mieć co najmniej 8 znaków.");
+      } else {
+        setServerError("Wystąpił błąd podczas rejestracji. Spróbuj ponownie.");
+      }
+    }
   };
 
   return (
@@ -76,28 +55,29 @@ export default function RegisterPage() {
             <p className="text-muted-foreground">Utwórz nowe konto</p>
           </div>
 
-          {/* Error message */}
-          {error && (
+          {/* Server error */}
+          {serverError && (
             <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive">{serverError}</p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <label htmlFor="name" className="block mb-2 text-foreground">
                 Imię i nazwisko
               </label>
               <input
                 id="name"
-                name="name"
                 type="text"
-                value={formData.name}
-                onChange={handleChange}
+                {...register("name")}
                 className="w-full px-4 py-3 bg-input-background rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                 placeholder="Jan Kowalski"
               />
+              {errors.name && (
+                <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>
+              )}
             </div>
 
             <div>
@@ -106,13 +86,14 @@ export default function RegisterPage() {
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
-                value={formData.email}
-                onChange={handleChange}
+                {...register("email")}
                 className="w-full px-4 py-3 bg-input-background rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                 placeholder="jan@example.com"
               />
+              {errors.email && (
+                <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>
+              )}
             </div>
 
             <div>
@@ -122,10 +103,8 @@ export default function RegisterPage() {
               <div className="relative">
                 <input
                   id="password"
-                  name="password"
                   type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={handleChange}
+                  {...register("password")}
                   className="w-full px-4 py-3 bg-input-background rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring transition-shadow pr-12"
                   placeholder="••••••••"
                 />
@@ -138,6 +117,9 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>
+              )}
             </div>
 
             <div>
@@ -147,10 +129,8 @@ export default function RegisterPage() {
               <div className="relative">
                 <input
                   id="confirmPassword"
-                  name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
+                  {...register("confirmPassword")}
                   className="w-full px-4 py-3 bg-input-background rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring transition-shadow pr-12"
                   placeholder="••••••••"
                 />
@@ -163,14 +143,18 @@ export default function RegisterPage() {
                   {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {errors.confirmPassword && (
+                <p className="mt-1 text-xs text-destructive">{errors.confirmPassword.message}</p>
+              )}
             </div>
 
             <button
               type="submit"
-              className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <UserPlus size={20} />
-              Zarejestruj się
+              {isSubmitting ? "Rejestrowanie..." : "Zarejestruj się"}
             </button>
           </form>
 

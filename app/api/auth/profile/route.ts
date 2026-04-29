@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
-
-const Schema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  currency: z.string().length(3).optional(),
-  language: z.string().optional(),
-});
+import { ProfileSchema as Schema } from "@/lib/validations";
 
 export async function PUT(request: NextRequest) {
   const auth = requireAuth(request);

@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, X, AlertTriangle } from "lucide-react";
+import { BudgetSchema, type BudgetFormData } from "@/lib/validations";
 
 type Category = { id: string; name: string };
 type Budget = {
@@ -17,32 +20,49 @@ type Budget = {
 export default function BudgetsClient({ initialBudgets, categories }: { initialBudgets: Budget[]; categories: Category[] }) {
   const [budgets, setBudgets] = useState(initialBudgets);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
-    categoryId: "",
-    amountLimit: "",
-    alertThreshold: "80",
-    periodStart: new Date().toISOString().slice(0, 7) + "-01",
-    periodEnd: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10),
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [serverError, setServerError] = useState("");
 
-  const handleSave = async () => {
-    if (!form.categoryId || !form.amountLimit) { setError("Wypełnij wymagane pola"); return; }
-    setLoading(true); setError("");
+  const defaultPeriodStart = new Date().toISOString().slice(0, 7) + "-01";
+  const defaultPeriodEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<BudgetFormData>({
+    resolver: zodResolver(BudgetSchema),
+    defaultValues: {
+      alertThreshold: 80,
+      periodStart: defaultPeriodStart,
+      periodEnd: defaultPeriodEnd,
+    },
+  });
+
+  const alertThreshold = watch("alertThreshold") ?? 80;
+
+  const openModal = () => {
+    setServerError("");
+    reset({ alertThreshold: 80, periodStart: defaultPeriodStart, periodEnd: defaultPeriodEnd });
+    setShowModal(true);
+  };
+
+  const onSubmit = async (data: BudgetFormData) => {
+    setServerError("");
     try {
       const res = await fetch("/api/budgets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, amountLimit: Number(form.amountLimit), alertThreshold: Number(form.alertThreshold) }),
+        body: JSON.stringify(data),
       });
       const json = await res.json();
       if (!res.ok) throw new Error("Błąd zapisu");
       setBudgets(prev => [{ ...json.data, spent: 0, amountLimit: Number(json.data.amountLimit) }, ...prev]);
       setShowModal(false);
-      setForm({ categoryId: "", amountLimit: "", alertThreshold: "80", periodStart: form.periodStart, periodEnd: form.periodEnd });
-    } catch { setError("Wystąpił błąd podczas zapisywania"); }
-    finally { setLoading(false); }
+    } catch {
+      setServerError("Wystąpił błąd podczas zapisywania");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -58,7 +78,7 @@ export default function BudgetsClient({ initialBudgets, categories }: { initialB
           <h1 className="mb-2">Budżety</h1>
           <p className="text-muted-foreground">Kontroluj wydatki według kategorii</p>
         </div>
-        <button onClick={() => { setError(""); setShowModal(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
+        <button onClick={openModal} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
           <Plus size={18} /> Nowy budżet
         </button>
       </div>
@@ -66,7 +86,7 @@ export default function BudgetsClient({ initialBudgets, categories }: { initialB
       {budgets.length === 0 && (
         <div className="bg-white rounded-lg border border-border p-12 text-center">
           <p className="text-muted-foreground mb-4">Nie masz jeszcze żadnych budżetów</p>
-          <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">Dodaj pierwszy budżet</button>
+          <button onClick={openModal} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">Dodaj pierwszy budżet</button>
         </div>
       )}
 
@@ -108,42 +128,46 @@ export default function BudgetsClient({ initialBudgets, categories }: { initialB
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h2>Nowy budżet</h2>
-              <button onClick={() => setShowModal(false)}><X size={20} className="text-muted-foreground" /></button>
+              <button type="button" onClick={() => setShowModal(false)}><X size={20} className="text-muted-foreground" /></button>
             </div>
-            {error && <p className="mb-4 text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">{error}</p>}
-            <div className="space-y-4">
+            {serverError && <p className="mb-4 text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">{serverError}</p>}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="block text-sm mb-1">Kategoria *</label>
-                <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring">
+                <select {...register("categoryId")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring">
                   <option value="">Wybierz kategorię</option>
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {errors.categoryId && <p className="mt-0.5 text-xs text-destructive">{errors.categoryId.message}</p>}
               </div>
               <div>
                 <label className="block text-sm mb-1">Limit (zł) *</label>
-                <input type="number" value={form.amountLimit} onChange={e => setForm(f => ({ ...f, amountLimit: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="500" min="0" step="0.01" />
+                <input type="number" {...register("amountLimit")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="500" min="0" step="0.01" />
+                {errors.amountLimit && <p className="mt-0.5 text-xs text-destructive">{errors.amountLimit.message}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Od</label>
-                  <input type="date" value={form.periodStart} onChange={e => setForm(f => ({ ...f, periodStart: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" />
+                  <input type="date" {...register("periodStart")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" />
+                  {errors.periodStart && <p className="mt-0.5 text-xs text-destructive">{errors.periodStart.message}</p>}
                 </div>
                 <div>
                   <label className="block text-sm mb-1">Do</label>
-                  <input type="date" value={form.periodEnd} onChange={e => setForm(f => ({ ...f, periodEnd: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" />
+                  <input type="date" {...register("periodEnd")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" />
+                  {errors.periodEnd && <p className="mt-0.5 text-xs text-destructive">{errors.periodEnd.message}</p>}
                 </div>
               </div>
               <div>
-                <label className="block text-sm mb-1">Alert przy (%): {form.alertThreshold}%</label>
-                <input type="range" min="50" max="100" value={form.alertThreshold} onChange={e => setForm(f => ({ ...f, alertThreshold: e.target.value }))} className="w-full" />
+                <label className="block text-sm mb-1">Alert przy (%): {alertThreshold}%</label>
+                <input type="range" min="50" max="100" {...register("alertThreshold")} className="w-full" />
               </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors">Anuluj</button>
-              <button onClick={handleSave} disabled={loading} className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
-                {loading ? "Zapisywanie..." : "Zapisz"}
-              </button>
-            </div>
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors">Anuluj</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+                  {isSubmitting ? "Zapisywanie..." : "Zapisz"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

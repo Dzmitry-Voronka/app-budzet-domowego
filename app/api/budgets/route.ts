@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
-
-const Schema = z.object({
-  categoryId: z.string().uuid(),
-  amountLimit: z.number().positive(),
-  periodStart: z.string(),
-  periodEnd: z.string(),
-  alertThreshold: z.number().min(0).max(100).optional(),
-});
+import { BudgetSchema as Schema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);

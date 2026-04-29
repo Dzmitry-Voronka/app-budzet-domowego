@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { comparePassword, hashPassword } from "@/lib/auth";
-
-const Schema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
-});
+import { PasswordSchema as Schema } from "@/lib/validations";
 
 export async function PUT(request: NextRequest) {
   const auth = requireAuth(request);

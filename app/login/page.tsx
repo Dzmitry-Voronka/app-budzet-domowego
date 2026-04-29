@@ -4,35 +4,41 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LogIn } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { LoginSchema, type LoginFormData } from "@/lib/validations";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [serverError, setServerError] = useState("");
   const router = useRouter();
 
-  const handleSubmit = (e: { preventDefault(): void }) => {
-    e.preventDefault();
-    setError("");
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(LoginSchema),
+  });
 
-    if (!email || !password) {
-      setError("Proszę wypełnić wszystkie pola");
-      return;
-    }
-    fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    })
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw json;
-        router.push("/");
-      })
-      .catch((err) => {
-        setError(err?.error?.code === "INVALID_CREDENTIALS" ? "Nieprawidłowy email lub hasło" : "Wystąpił błąd podczas logowania");
+  const onSubmit = async (data: LoginFormData) => {
+    setServerError("");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
+      const json = await res.json();
+      if (!res.ok) throw json;
+      router.push("/");
+    } catch (err: any) {
+      setServerError(
+        err?.error?.code === "INVALID_CREDENTIALS"
+          ? "Nieprawidłowy email lub hasło"
+          : "Wystąpił błąd podczas logowania"
+      );
+    }
   };
 
   return (
@@ -45,15 +51,15 @@ export default function LoginPage() {
             <p className="text-muted-foreground">Zaloguj się do swojego konta</p>
           </div>
 
-          {/* Error message */}
-          {error && (
+          {/* Server error */}
+          {serverError && (
             <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive">{serverError}</p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <label htmlFor="email" className="block mb-2 text-foreground">
                 Email
@@ -61,11 +67,13 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register("email")}
                 className="w-full px-4 py-3 bg-input-background rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                 placeholder="jan@example.com"
               />
+              {errors.email && (
+                <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>
+              )}
             </div>
 
             <div>
@@ -76,8 +84,7 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  {...register("password")}
                   className="w-full px-4 py-3 bg-input-background rounded-lg border border-border focus:outline-none focus:ring-2 focus:ring-ring transition-shadow pr-12"
                   placeholder="••••••••"
                 />
@@ -90,6 +97,9 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
+              {errors.password && (
+                <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between">
@@ -107,10 +117,11 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              disabled={isSubmitting}
+              className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
             >
               <LogIn size={20} />
-              Zaloguj się
+              {isSubmitting ? "Logowanie..." : "Zaloguj się"}
             </button>
           </form>
 

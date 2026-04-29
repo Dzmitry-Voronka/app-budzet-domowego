@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getTokenFromRequest, verifyToken } from "@/lib/auth";
 import { z } from "zod";
+import { TransactionSchema } from "@/lib/validations";
 
 // ── GET /api/transactions ──
 export async function GET(request: NextRequest) {
@@ -66,9 +67,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const schema = z.object({ categoryId: z.string().uuid(), amount: z.string().or(z.number()), type: z.enum(["INCOME", "EXPENSE"]), description: z.string().optional(), date: z.string() });
   try {
-    const parsed = schema.parse(body);
+    const parsed = TransactionSchema.parse(body);
     const transaction = await prisma.transaction.create({
       data: {
         user: { connect: { id: userId } },

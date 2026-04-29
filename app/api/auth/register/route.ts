@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, signToken } from "@/lib/auth";
-
-const RegisterSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(8),
-});
+import { RegisterBaseSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const parsed = RegisterSchema.parse(body);
+    const parsed = RegisterBaseSchema.parse(body);
 
     const existing = await prisma.user.findUnique({ where: { email: parsed.email } });
     if (existing) {

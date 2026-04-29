@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, X, Target, PlusCircle, MinusCircle, Trash2 } from "lucide-react";
+import { SavingsGoalSchema, type SavingsGoalFormData } from "@/lib/validations";
 
 type Goal = {
   id: string;
@@ -16,33 +19,47 @@ export default function SavingsClient({ initialGoals }: { initialGoals: Goal[] }
   const [goals, setGoals] = useState(initialGoals);
   const [showAdd, setShowAdd] = useState(false);
   const [depositModal, setDepositModal] = useState<{ goal: Goal; type: "deposit" | "withdraw" } | null>(null);
-  const [form, setForm] = useState({ name: "", targetAmount: "", deadline: "", icon: "🎯" });
   const [depositAmount, setDepositAmount] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [serverError, setServerError] = useState("");
 
-  const handleCreate = async () => {
-    if (!form.name || !form.targetAmount) { setError("Wypełnij wymagane pola"); return; }
-    setLoading(true); setError("");
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<SavingsGoalFormData>({
+    resolver: zodResolver(SavingsGoalSchema),
+    defaultValues: { icon: "🎯" },
+  });
+
+  const openAdd = () => {
+    setServerError("");
+    reset({ icon: "🎯", name: "", targetAmount: undefined, deadline: "" });
+    setShowAdd(true);
+  };
+
+  const onSubmit = async (data: SavingsGoalFormData) => {
+    setServerError("");
     try {
       const res = await fetch("/api/savings-goals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, targetAmount: Number(form.targetAmount), deadline: form.deadline || null, icon: form.icon }),
+        body: JSON.stringify({ ...data, deadline: data.deadline || null }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error("Błąd");
       setGoals(prev => [{ ...json.data, targetAmount: Number(json.data.targetAmount), currentAmount: Number(json.data.currentAmount) }, ...prev]);
       setShowAdd(false);
-      setForm({ name: "", targetAmount: "", deadline: "", icon: "🎯" });
-    } catch { setError("Wystąpił błąd"); }
-    finally { setLoading(false); }
+    } catch {
+      setServerError("Wystąpił błąd");
+    }
   };
 
   const handleDeposit = async () => {
     if (!depositModal || !depositAmount) return;
     const amount = Number(depositAmount) * (depositModal.type === "withdraw" ? -1 : 1);
-    setLoading(true);
+    setDepositLoading(true);
     try {
       const res = await fetch(`/api/savings-goals/${depositModal.goal.id}`, {
         method: "PATCH",
@@ -55,7 +72,7 @@ export default function SavingsClient({ initialGoals }: { initialGoals: Goal[] }
       setDepositModal(null);
       setDepositAmount("");
     } catch { alert("Wystąpił błąd"); }
-    finally { setLoading(false); }
+    finally { setDepositLoading(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -71,7 +88,7 @@ export default function SavingsClient({ initialGoals }: { initialGoals: Goal[] }
           <h1 className="mb-2">Oszczędności</h1>
           <p className="text-muted-foreground">Śledź swoje cele oszczędnościowe</p>
         </div>
-        <button onClick={() => { setError(""); setShowAdd(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
+        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
           <Plus size={18} /> Nowy cel
         </button>
       </div>
@@ -80,8 +97,7 @@ export default function SavingsClient({ initialGoals }: { initialGoals: Goal[] }
         <div className="bg-white rounded-lg border border-border p-12 text-center">
           <Target size={40} className="mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground mb-4">Nie masz jeszcze żadnych celów oszczędnościowych</p>
-          <button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">Dodaj pierwszy cel</button>
-        </div>
+          <button onClick={() => setShowAdd(true)} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90">Dodaj pierwszy cel</button>        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -127,33 +143,35 @@ export default function SavingsClient({ initialGoals }: { initialGoals: Goal[] }
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h2>Nowy cel oszczędnościowy</h2>
-              <button onClick={() => setShowAdd(false)}><X size={20} className="text-muted-foreground" /></button>
+              <button type="button" onClick={() => setShowAdd(false)}><X size={20} className="text-muted-foreground" /></button>
             </div>
-            {error && <p className="mb-4 text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">{error}</p>}
-            <div className="space-y-4">
+            {serverError && <p className="mb-4 text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">{serverError}</p>}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="block text-sm mb-1">Nazwa celu *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="np. Wakacje" />
+                <input {...register("name")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="np. Wakacje" />
+                {errors.name && <p className="mt-0.5 text-xs text-destructive">{errors.name.message}</p>}
               </div>
               <div>
                 <label className="block text-sm mb-1">Kwota docelowa (zł) *</label>
-                <input type="number" value={form.targetAmount} onChange={e => setForm(f => ({ ...f, targetAmount: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="5000" min="0" step="0.01" />
+                <input type="number" {...register("targetAmount")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="5000" min="0" step="0.01" />
+                {errors.targetAmount && <p className="mt-0.5 text-xs text-destructive">{errors.targetAmount.message}</p>}
               </div>
               <div>
                 <label className="block text-sm mb-1">Termin (opcjonalnie)</label>
-                <input type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" />
+                <input type="date" {...register("deadline")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" />
               </div>
               <div>
                 <label className="block text-sm mb-1">Ikona (emoji)</label>
-                <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" placeholder="🎯" />
+                <input {...register("icon")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" placeholder="🎯" />
               </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent">Anuluj</button>
-              <button onClick={handleCreate} disabled={loading} className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
-                {loading ? "Tworzenie..." : "Utwórz cel"}
-              </button>
-            </div>
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowAdd(false)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent">Anuluj</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50">
+                  {isSubmitting ? "Tworzenie..." : "Utwórz cel"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

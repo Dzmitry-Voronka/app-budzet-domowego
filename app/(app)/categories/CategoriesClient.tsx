@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, X, Tag } from "lucide-react";
+import { CategorySchema, type CategoryFormData } from "@/lib/validations";
 
 type SubCategory = { id: string; name: string; type: "INCOME" | "EXPENSE"; icon: string | null; color: string | null; userId: string | null };
 type Category = SubCategory & { subcategories: SubCategory[] };
@@ -12,33 +15,52 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
   const [categories, setCategories] = useState(initialCategories);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [form, setForm] = useState({ name: "", type: "EXPENSE" as "INCOME" | "EXPENSE", icon: "📦", color: COLORS[0] });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [serverError, setServerError] = useState("");
 
-  const openAdd = () => { setEditing(null); setForm({ name: "", type: "EXPENSE", icon: "📦", color: COLORS[0] }); setError(""); setShowModal(true); };
-  const openEdit = (c: Category) => { setEditing(c); setForm({ name: c.name, type: c.type, icon: c.icon ?? "📦", color: c.color ?? COLORS[0] }); setError(""); setShowModal(true); };
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<CategoryFormData>({
+    resolver: zodResolver(CategorySchema),
+    defaultValues: { name: "", type: "EXPENSE", icon: "📦", color: COLORS[0] },
+  });
 
-  const handleSave = async () => {
-    if (!form.name.trim()) { setError("Podaj nazwę kategorii"); return; }
-    setLoading(true);
-    setError("");
+  const selectedColor = watch("color");
+
+  const openAdd = () => {
+    setEditing(null);
+    reset({ name: "", type: "EXPENSE", icon: "📦", color: COLORS[0] });
+    setServerError("");
+    setShowModal(true);
+  };
+
+  const openEdit = (c: Category) => {
+    setEditing(c);
+    reset({ name: c.name, type: c.type, icon: c.icon ?? "📦", color: c.color ?? COLORS[0] });
+    setServerError("");
+    setShowModal(true);
+  };
+
+  const onSubmit = async (data: CategoryFormData) => {
+    setServerError("");
     try {
       const url = editing ? `/api/categories/${editing.id}` : "/api/categories";
       const method = editing ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error?.message || "Błąd");
       if (editing) {
-        setCategories(prev => prev.map(c => c.id === editing.id ? { ...c, ...form } : c));
+        setCategories(prev => prev.map(c => c.id === editing.id ? { ...c, ...data } : c));
       } else {
         setCategories(prev => [...prev, { ...json.data, subcategories: [] }]);
       }
       setShowModal(false);
-    } catch (e: any) {
-      setError(e.message || "Wystąpił błąd");
-    } finally {
-      setLoading(false);
+    } catch (e: unknown) {
+      setServerError((e as Error)?.message || "Wystąpił błąd");
     }
   };
 
@@ -93,42 +115,44 @@ export default function CategoriesClient({ initialCategories }: { initialCategor
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-5">
               <h2>{editing ? "Edytuj kategorię" : "Nowa kategoria"}</h2>
-              <button onClick={() => setShowModal(false)}><X size={20} className="text-muted-foreground" /></button>
+              <button type="button" onClick={() => setShowModal(false)}><X size={20} className="text-muted-foreground" /></button>
             </div>
-            {error && <p className="mb-4 text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">{error}</p>}
-            <div className="space-y-4">
+            {serverError && <p className="mb-4 text-sm text-destructive bg-destructive/10 px-3 py-2 rounded">{serverError}</p>}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
                 <label className="block text-sm mb-1">Nazwa *</label>
-                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="np. Jedzenie" />
+                <input {...register("name")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring" placeholder="np. Jedzenie" />
+                {errors.name && <p className="mt-0.5 text-xs text-destructive">{errors.name.message}</p>}
               </div>
               {!editing && (
                 <div>
                   <label className="block text-sm mb-1">Typ *</label>
-                  <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none">
+                  <select {...register("type")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none">
                     <option value="EXPENSE">Wydatek</option>
                     <option value="INCOME">Przychód</option>
                   </select>
+                  {errors.type && <p className="mt-0.5 text-xs text-destructive">{errors.type.message}</p>}
                 </div>
               )}
               <div>
                 <label className="block text-sm mb-1">Ikona (emoji)</label>
-                <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" placeholder="📦" />
+                <input {...register("icon")} className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none" placeholder="📦" />
               </div>
               <div>
                 <label className="block text-sm mb-2">Kolor</label>
                 <div className="flex gap-2 flex-wrap">
                   {COLORS.map(c => (
-                    <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className={`w-8 h-8 rounded-full border-2 transition-all ${form.color === c ? "border-primary scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} />
+                    <button key={c} type="button" onClick={() => setValue("color", c)} className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor === c ? "border-primary scale-110" : "border-transparent"}`} style={{ backgroundColor: c }} />
                   ))}
                 </div>
               </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors">Anuluj</button>
-              <button onClick={handleSave} disabled={loading} className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
-                {loading ? "Zapisywanie..." : "Zapisz"}
-              </button>
-            </div>
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-accent transition-colors">Anuluj</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
+                  {isSubmitting ? "Zapisywanie..." : "Zapisz"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
